@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
+import '../widgets/animated_components.dart';
 import 'auth/login_screen.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
@@ -8,8 +9,8 @@ class RoleSelectionScreen extends StatelessWidget {
   void _onSelectRole(BuildContext context, String roleEnum) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => LoginScreen(initialRole: roleEnum),
+      SmoothPageRoute(
+        page: LoginScreen(initialRole: roleEnum),
       ),
     );
   }
@@ -24,117 +25,165 @@ class RoleSelectionScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  const SizedBox(width: 10),
-                  const Text(
-                    'SI-PAKET',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.navyPrimary,
-                      letterSpacing: 0.5,
+              // Header Brand
+              FadeSlideIn(
+                delayMs: 40,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 10),
+                    const Text(
+                      'SI-PAKET',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.navyPrimary,
+                        letterSpacing: 0.5,
+                      ),
                     ),
-                  ),
-                  
-                ],
+                    const SizedBox(width: 10),
+                  ],
+                ),
               ),
               const SizedBox(height: 24),
 
-              // Ilustrasi Hero Card (Gudang -> Paket -> Truk -> Pin Lokasi)
-              Container(
-                width: double.infinity,
-                height: 200,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceGray,
-                  borderRadius: BorderRadius.circular(24),
+              // Ilustrasi Hero Card dengan Floating Micro-Interactions
+              FadeSlideIn(
+                delayMs: 120,
+                child: Container(
+                  width: double.infinity,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceGray,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Positioned(
+                        top: 42,
+                        child: SizedBox(
+                          width: 210,
+                          height: 60,
+                          child: CustomPaint(
+                            painter: _DashedArcPainter(),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 52,
+                        top: 66,
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.navyPrimary,
+                              width: 2,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.warehouse_outlined,
+                            color: AppColors.navyPrimary,
+                            size: 28,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 54,
+                        top: 34,
+                        child: FloatingWidget(
+                          distance: 4.0,
+                          durationMs: 1800,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(
+                              color: AppColors.navyPrimary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.location_on,
+                              color: AppColors.yellowAccent,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 88,
+                        bottom: 34,
+                        child: FloatingWidget(
+                          distance: 3.5,
+                          durationMs: 2400,
+                          child: Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppColors.yellowAccent,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: AppColors.navyPrimary,
+                                width: 2.2,
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.inventory_2,
+                              color: AppColors.navyPrimary,
+                              size: 34,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 68,
+                        bottom: 38,
+                        child: FloatingWidget(
+                          distance: 3.0,
+                          durationMs: 2000,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.navyPrimary,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(
+                              Icons.local_shipping,
+                              color: Colors.white,
+                              size: 32,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Stack(
-                  alignment: Alignment.center,
+              ),
+              const SizedBox(height: 28),
+
+              // Headline & Subheadline
+              const FadeSlideIn(
+                delayMs: 200,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Positioned(
-                      top: 42,
-                      child: SizedBox(
-                        width: 210,
-                        height: 60,
-                        child: CustomPaint(
-                          painter: _DashedArcPainter(),
-                        ),
+                    Text(
+                      'Paket terhubung.\nSemua lebih mudah.',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        height: 1.2,
                       ),
                     ),
-                    Positioned(
-                      left: 52,
-                      top: 66,
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppColors.navyPrimary,
-                            width: 2,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.warehouse_outlined,
-                          color: AppColors.navyPrimary,
-                          size: 28,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      right: 54,
-                      top: 34,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: const BoxDecoration(
-                          color: AppColors.navyPrimary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.location_on,
-                          color: AppColors.yellowAccent,
-                          size: 22,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      left: 88,
-                      bottom: 34,
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.yellowAccent,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: AppColors.navyPrimary,
-                            width: 2.2,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.inventory_2,
-                          color: AppColors.navyPrimary,
-                          size: 34,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      right: 68,
-                      bottom: 38,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.navyPrimary,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(
-                          Icons.local_shipping,
-                          color: Colors.white,
-                          size: 32,
-                        ),
+                    SizedBox(height: 10),
+                    Text(
+                      'Kelola pengiriman dan pantau paket dalam satu genggaman.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                        height: 1.5,
                       ),
                     ),
                   ],
@@ -142,69 +191,75 @@ class RoleSelectionScreen extends StatelessWidget {
               ),
               const SizedBox(height: 28),
 
-              const Text(
-                'Paket terhubung.\nSemua lebih mudah.',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  height: 1.2,
-                ),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'Kelola pengiriman dan pantau paket dalam satu genggaman.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 28),
-
-              const Text(
-                'Masuk sebagai',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+              const FadeSlideIn(
+                delayMs: 260,
+                child: Text(
+                  'Masuk sebagai',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
 
-              // 3 Pilihan Role Cards -> mengarah ke LoginScreen dengan enum backend
-              _RoleOptionCard(
-                icon: Icons.warehouse_outlined,
-                title: 'Admin Pos',
-                subtitle: 'Kelola paket & penugasan kurir',
-                onTap: () => _onSelectRole(context, 'PetugasGudang'),
+              // 3 Pilihan Role Cards dengan Staggered Delay + BouncyTap
+              FadeSlideIn(
+                delayMs: 320,
+                child: _RoleOptionCard(
+                  icon: Icons.warehouse_outlined,
+                  title: 'Admin Pos',
+                  subtitle: 'Kelola paket & penugasan kurir',
+                  onTap: () => _onSelectRole(context, 'PetugasGudang'),
+                ),
               ),
               const SizedBox(height: 12),
-              _RoleOptionCard(
-                icon: Icons.local_shipping_outlined,
-                title: 'Kurir',
-                subtitle: 'Antarkan paket, perbarui status',
-                onTap: () => _onSelectRole(context, 'Kurir'),
+              FadeSlideIn(
+                delayMs: 400,
+                child: _RoleOptionCard(
+                  icon: Icons.local_shipping_outlined,
+                  title: 'Kurir',
+                  subtitle: 'Antarkan paket, perbarui status',
+                  onTap: () => _onSelectRole(context, 'Kurir'),
+                ),
               ),
               const SizedBox(height: 12),
-              _RoleOptionCard(
-                icon: Icons.person_outline,
-                title: 'User/Pelanggan',
-                subtitle: 'Lacak & konfirmasi paket Anda',
-                onTap: () => _onSelectRole(context, 'User'),
+              FadeSlideIn(
+                delayMs: 480,
+                child: _RoleOptionCard(
+                  icon: Icons.person_outline,
+                  title: 'User/Pelanggan',
+                  subtitle: 'Lacak & konfirmasi paket Anda',
+                  onTap: () => _onSelectRole(context, 'User'),
+                ),
               ),
               const SizedBox(height: 28),
 
-            
-              const SizedBox(height: 20),
-              const Center(
-                child: Text(
-                  'SI-PAKET',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textMuted,
-                  ),
+              const FadeSlideIn(
+                delayMs: 540,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Satu platform. Tiga peran. Satu tujuan.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    Center(
+                      child: Text(
+                        'SI-PAKET',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -230,9 +285,8 @@ class _RoleOptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return BouncyTap(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(

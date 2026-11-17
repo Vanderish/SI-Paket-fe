@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
-import 'screens/role_selection_screen.dart';
+import 'screens/splash_screen.dart';
 
 void main() {
   runApp(const SiPaketApp());
@@ -15,7 +15,7 @@ class SiPaketApp extends StatelessWidget {
       title: 'SI-PAKET',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const RoleSelectionScreen(),
+      home: const SplashScreen(),
     );
   }
 }

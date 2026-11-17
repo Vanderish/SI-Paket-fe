@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/api_service.dart';
-import '../auth/login_screen.dart' hide ApiService;
+import '../../widgets/animated_components.dart';
+import '../auth/login_screen.dart';
 import '../role_selection_screen.dart';
 
 class PelangganMainScreen extends StatefulWidget {
@@ -16,12 +17,10 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
   bool _isLoggedIn = false;
   String _userNama = 'Pelanggan';
 
-  // State Tab Lacak (Public Tracking)
   final _resiController = TextEditingController();
   bool _isLoadingTrack = false;
   Map<String, dynamic>? _trackingData;
 
-  // State Tab Kiriman Saya (Authenticated User)
   bool _isLoadingKiriman = false;
   List<Map<String, dynamic>> _paketSaya = [];
 
@@ -82,10 +81,12 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
       final raw = await ApiService.getPaketSaya();
       if (!mounted) return;
       setState(() {
-        _paketSaya = raw.cast<Map<String, dynamic>>();
+        _paketSaya = raw
+            .map((item) => Map<String, dynamic>.from(item as Map))
+            .toList();
         if (_paketSaya.isNotEmpty && _resiController.text.isEmpty) {
           _resiController.text =
-              (_paketSaya.first['nomorResi'] ?? '').toString();
+              (_paketSaya.first['noResi'] ?? '').toString();
         }
       });
     } catch (e) {
@@ -98,7 +99,8 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
 
   Future<void> _showBuatPaketDialog() async {
     final penerimaCtrl = TextEditingController();
-    final alamatCtrl = TextEditingController();
+    final alamatAsalCtrl = TextEditingController(text: 'Surabaya');
+    final alamatTujuanCtrl = TextEditingController();
     final beratCtrl = TextEditingController(text: '1.0');
     String jenis = 'Reguler';
 
@@ -118,7 +120,12 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
                 ),
                 const SizedBox(height: 10),
                 TextField(
-                  controller: alamatCtrl,
+                  controller: alamatAsalCtrl,
+                  decoration: const InputDecoration(labelText: 'Alamat Asal'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: alamatTujuanCtrl,
                   decoration: const InputDecoration(labelText: 'Alamat Tujuan'),
                 ),
                 const SizedBox(height: 10),
@@ -148,21 +155,22 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
             ElevatedButton(
               onPressed: () async {
                 if (penerimaCtrl.text.trim().isEmpty ||
-                    alamatCtrl.text.trim().isEmpty) {
+                    alamatTujuanCtrl.text.trim().isEmpty) {
                   return;
                 }
                 try {
                   final berat =
                       double.tryParse(beratCtrl.text.replaceAll(',', '.')) ??
                           1.0;
-                  await ApiService.buatPaketUser({
-                    'namaPenerima': penerimaCtrl.text.trim(),
-                    'alamatTujuan': alamatCtrl.text.trim(),
-                    'kotaAsal': 'Surabaya',
-                    'kotaTujuan': 'Surabaya',
-                    'berat': berat,
-                    'jenisPaket': jenis,
-                  });
+                  await ApiService.buatPaketUser(
+                    namaPenerima: penerimaCtrl.text.trim(),
+                    alamatAsal: alamatAsalCtrl.text.trim().isEmpty
+                        ? 'Surabaya'
+                        : alamatAsalCtrl.text.trim(),
+                    alamatTujuan: alamatTujuanCtrl.text.trim(),
+                    beratKg: berat,
+                    jenisPaket: jenis,
+                  );
                   if (ctx.mounted) Navigator.pop(ctx, true);
                 } catch (e) {
                   if (mounted) {
@@ -193,7 +201,7 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+      SmoothPageRoute(page: const RoleSelectionScreen()),
       (route) => false,
     );
   }
@@ -203,11 +211,16 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: _tabIndex == 0
-            ? _buildLacakTab()
-            : _tabIndex == 1
-                ? _buildKirimanTab()
-                : _buildAkunTab(),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 240),
+          child: _tabIndex == 0
+              ? KeyedSubtree(key: const ValueKey(0), child: _buildLacakTab())
+              : _tabIndex == 1
+                  ? KeyedSubtree(
+                      key: const ValueKey(1), child: _buildKirimanTab())
+                  : KeyedSubtree(
+                      key: const ValueKey(2), child: _buildAkunTab()),
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _tabIndex,
@@ -228,13 +241,14 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
     );
   }
 
-  // SCREEN 05 · Pelanggan & Pelacakan
   Widget _buildLacakTab() {
-    final paketObj = (_trackingData?['paket'] is Map<String, dynamic>)
-        ? _trackingData!['paket'] as Map<String, dynamic>
+    final paketObj = (_trackingData?['paket'] is Map)
+        ? Map<String, dynamic>.from(_trackingData!['paket'] as Map)
         : _trackingData;
-    final riwayatList = (_trackingData?['riwayat'] as List? ?? [])
-        .cast<Map<String, dynamic>>();
+    final riwayatRaw = (_trackingData?['riwayat'] as List? ?? []);
+    final riwayatList = riwayatRaw
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -244,7 +258,7 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
           GestureDetector(
             onTap: () => Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+              SmoothPageRoute(page: const RoleSelectionScreen()),
               (route) => false,
             ),
             child: Row(
@@ -278,7 +292,6 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
             style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 20),
-
           const Text(
             'Cari Paket / Cek Nomor Resi',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
@@ -306,7 +319,7 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
                 ),
               ),
               const SizedBox(width: 10),
-              GestureDetector(
+              BouncyTap(
                 onTap: _isLoadingTrack ? null : _cariResi,
                 child: Container(
                   width: 52,
@@ -329,141 +342,165 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
             ],
           ),
           const SizedBox(height: 20),
-
           if (paketObj == null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceGray,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Column(
-                children: [
-                  Icon(Icons.local_shipping_outlined,
-                      size: 40, color: AppColors.textMuted),
-                  SizedBox(height: 10),
-                  Text(
-                    'Masukkan nomor resi di atas untuk melihat posisi paket secara real-time.',
-                    textAlign: TextAlign.center,
-                    style:
-                        TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                  ),
-                ],
+            FadeSlideIn(
+              delayMs: 80,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceGray,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Column(
+                  children: [
+                    Icon(Icons.local_shipping_outlined,
+                        size: 40, color: AppColors.textMuted),
+                    SizedBox(height: 10),
+                    Text(
+                      'Masukkan nomor resi di atas untuk melihat posisi paket secara real-time.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 13, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
               ),
             )
           else ...[
-            // Kartu Resi Utama (Dark Navy)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.navyPrimary,
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'NOMOR RESI',
-                    style: TextStyle(
-                        color: Colors.white60,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    (paketObj['nomorResi'] ?? _resiController.text).toString(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
+            FadeSlideIn(
+              delayMs: 40,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.navyPrimary,
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'NOMOR RESI',
+                      style: TextStyle(
+                          color: Colors.white60,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      (paketObj['status'] ?? 'Dalam Proses').toString(),
+                    const SizedBox(height: 4),
+                    Text(
+                      (paketObj['noResi'] ?? _resiController.text).toString(),
                       style: const TextStyle(
-                        fontSize: 11,
+                        color: Colors.white,
+                        fontSize: 22,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.badgeBlueText,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        (paketObj['kotaAsal'] ?? 'Asal').toString(),
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      const Icon(Icons.arrow_forward,
-                          color: AppColors.yellowAccent, size: 18),
-                      Text(
-                        (paketObj['kotaTujuan'] ?? 'Tujuan').toString(),
+                      child: Text(
+                        (paketObj['statusTerkini'] ?? 'Dalam Proses')
+                            .toString(),
                         style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.badgeBlueText,
+                        ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${paketObj['jenisPaket'] ?? 'Reguler'} · ${paketObj['berat'] ?? '-'} kg',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            (paketObj['posTerkini'] ??
+                                    paketObj['alamatAsal'] ??
+                                    'Gudang Asal')
+                                .toString(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Icon(Icons.arrow_forward,
+                              color: AppColors.yellowAccent, size: 18),
+                        ),
+                        Expanded(
+                          child: Text(
+                            (paketObj['alamatTujuan'] ?? 'Tujuan Penerima')
+                                .toString(),
+                            textAlign: TextAlign.right,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      paketObj['estimasiHari'] != null
+                          ? 'Estimasi tiba: ${paketObj['estimasiHari']} hari'
+                          : '${paketObj['jenisPaket'] ?? 'Reguler'} · ${paketObj['beratKg'] ?? '-'} kg',
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 14),
-
-            // Penerima Card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceGray,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'PENERIMA',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textSecondary),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    (paketObj['namaPenerima'] ?? '-').toString(),
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w800),
-                  ),
-                  Text(
-                    (paketObj['alamatTujuan'] ?? '-').toString(),
-                    style: const TextStyle(
-                        fontSize: 13, color: AppColors.textSecondary),
-                  ),
-                ],
+            FadeSlideIn(
+              delayMs: 110,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceGray,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'PENERIMA',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      (paketObj['namaPenerima'] ?? '-').toString(),
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w800),
+                    ),
+                    if (paketObj['alamatTujuan'] != null)
+                      Text(
+                        paketObj['alamatTujuan'].toString(),
+                        style: const TextStyle(
+                            fontSize: 13, color: AppColors.textSecondary),
+                      ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 22),
-
-            // Timeline Riwayat Pelacakan
             const Text(
               'Riwayat pelacakan',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
@@ -473,7 +510,6 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
-
             if (riwayatList.isEmpty)
               const Text('Belum ada catatan riwayat transit.',
                   style: TextStyle(color: AppColors.textSecondary))
@@ -482,57 +518,60 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
                 final idx = entry.key;
                 final item = entry.value;
                 final isFirst = idx == 0;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: isFirst
-                              ? AppColors.yellowAccent
-                              : AppColors.surfaceGray,
-                          shape: BoxShape.circle,
+                return FadeSlideIn(
+                  delayMs: 140 + (idx * 75),
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isFirst
+                                ? AppColors.yellowAccent
+                                : AppColors.surfaceGray,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            isFirst
+                                ? Icons.local_shipping_outlined
+                                : Icons.inventory_2_outlined,
+                            size: 16,
+                            color: AppColors.navyPrimary,
+                          ),
                         ),
-                        child: Icon(
-                          isFirst
-                              ? Icons.local_shipping_outlined
-                              : Icons.inventory_2_outlined,
-                          size: 16,
-                          color: AppColors.navyPrimary,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              (item['waktu'] ?? item['timestamp'] ?? '-')
-                                  .toString(),
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: isFirst
-                                    ? AppColors.badgeBlueText
-                                    : AppColors.textSecondary,
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                (item['waktuUpdate'] ?? '-').toString(),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: isFirst
+                                      ? AppColors.badgeBlueText
+                                      : AppColors.textSecondary,
+                                ),
                               ),
-                            ),
-                            Text(
-                              (item['lokasi'] ?? '-').toString(),
-                              style: const TextStyle(
-                                  fontSize: 15, fontWeight: FontWeight.w800),
-                            ),
-                            Text(
-                              (item['keterangan'] ?? '').toString(),
-                              style: const TextStyle(
-                                  fontSize: 13, color: AppColors.textSecondary),
-                            ),
-                          ],
+                              Text(
+                                (item['lokasiUpdate'] ?? '-').toString(),
+                                style: const TextStyle(
+                                    fontSize: 15, fontWeight: FontWeight.w800),
+                              ),
+                              Text(
+                                (item['deskripsiStatus'] ?? '').toString(),
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.textSecondary),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 );
               }),
@@ -542,7 +581,6 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
     );
   }
 
-  // SCREEN 06 · Daftar Kiriman & Status Penerimaan
   Widget _buildKirimanTab() {
     if (!_isLoggedIn) {
       return Padding(
@@ -572,8 +610,8 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => const LoginScreen(initialRole: 'User'),
+                    SmoothPageRoute(
+                      page: const LoginScreen(initialRole: 'User'),
                     ),
                   );
                 },
@@ -618,18 +656,21 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
                   ),
                 ],
               ),
-              ElevatedButton.icon(
-                onPressed: _showBuatPaketDialog,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.yellowAccent,
-                  foregroundColor: AppColors.navyPrimary,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+              BouncyTap(
+                onTap: _showBuatPaketDialog,
+                child: ElevatedButton.icon(
+                  onPressed: _showBuatPaketDialog,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.yellowAccent,
+                    foregroundColor: AppColors.navyPrimary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Kirim',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Kirim',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
               ),
             ],
           ),
@@ -646,70 +687,76 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
               ),
             )
           else
-            ..._paketSaya.map((p) {
-              final resi = (p['nomorResi'] ?? '-').toString();
-              final status = (p['status'] ?? 'Menunggu Penjemputan').toString();
-              final isSelesai = status.toLowerCase().contains('selesai');
+            ..._paketSaya.asMap().entries.map((entry) {
+              final p = entry.value;
+              final resi = (p['noResi'] ?? '-').toString();
+              final status =
+                  (p['statusTerkini'] ?? 'Menunggu Penjemputan').toString();
+              final isSelesai = status.toLowerCase().contains('selesai') ||
+                  status.toLowerCase().contains('diterima');
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 14),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceGray,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(resi,
-                            style: const TextStyle(
-                                fontSize: 15, fontWeight: FontWeight.w800)),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: isSelesai
-                                ? AppColors.badgeGreenBg
-                                : AppColors.yellowSoft,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            status,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
+              return FadeSlideIn(
+                delayMs: 60 + (entry.key * 70),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceGray,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(resi,
+                              style: const TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.w800)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
                               color: isSelesai
-                                  ? AppColors.badgeGreenText
-                                  : AppColors.yellowText,
+                                  ? AppColors.badgeGreenBg
+                                  : AppColors.yellowSoft,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              status,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: isSelesai
+                                    ? AppColors.badgeGreenText
+                                    : AppColors.yellowText,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text((p['namaPenerima'] ?? '-').toString(),
-                        style: const TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w700)),
-                    Text((p['alamatTujuan'] ?? '-').toString(),
-                        style: const TextStyle(
-                            fontSize: 13, color: AppColors.textSecondary)),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          _resiController.text = resi;
-                          setState(() => _tabIndex = 0);
-                          _cariResi();
-                        },
-                        icon: const Icon(Icons.timeline, size: 16),
-                        label: const Text('Lihat Detail Pelacakan'),
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      Text((p['namaPenerima'] ?? '-').toString(),
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
+                      Text((p['alamatTujuan'] ?? '-').toString(),
+                          style: const TextStyle(
+                              fontSize: 13, color: AppColors.textSecondary)),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            _resiController.text = resi;
+                            setState(() => _tabIndex = 0);
+                            _cariResi();
+                          },
+                          icon: const Icon(Icons.timeline, size: 16),
+                          label: const Text('Lihat Detail Pelacakan'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }),
@@ -768,8 +815,8 @@ class _PelangganMainScreenState extends State<PelangganMainScreen> {
                   : () {
                       Navigator.pushAndRemoveUntil(
                         context,
-                        MaterialPageRoute(
-                            builder: (_) => const RoleSelectionScreen()),
+                        SmoothPageRoute(
+                            page: const RoleSelectionScreen()),
                         (route) => false,
                       );
                     },

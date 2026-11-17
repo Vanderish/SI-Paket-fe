@@ -42,21 +42,39 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       final paketRaw = await ApiService.getGudangPaket();
       final kurirRaw = await ApiService.getDaftarKurir();
 
-      final paketList = paketRaw.cast<Map<String, dynamic>>();
-      final kurirList = kurirRaw.cast<Map<String, dynamic>>();
+      final paketList = paketRaw
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+      final kurirList = kurirRaw
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
 
       if (!mounted) return;
       setState(() {
         _adminNama = nama ?? 'Admin Pos';
         _daftarPaket = paketList;
         _daftarKurir = kurirList;
+
         if (_daftarPaket.isNotEmpty) {
-          _selectedResiForAction ??=
-              _daftarPaket.first['nomorResi']?.toString();
+          final validResi = _daftarPaket
+              .any((p) => p['noResi']?.toString() == _selectedResiForAction);
+          if (!validResi) {
+            _selectedResiForAction = _daftarPaket.first['noResi']?.toString();
+          }
+        } else {
+          _selectedResiForAction = null;
         }
+
         if (_daftarKurir.isNotEmpty) {
-          _selectedKurirId ??=
-              int.tryParse(_daftarKurir.first['id']?.toString() ?? '');
+          final validKurir = _daftarKurir.any((k) =>
+              int.tryParse(k['idPengguna']?.toString() ?? '') ==
+              _selectedKurirId);
+          if (!validKurir) {
+            _selectedKurirId = int.tryParse(
+                _daftarKurir.first['idPengguna']?.toString() ?? '');
+          }
+        } else {
+          _selectedKurirId = null;
         }
       });
     } catch (e) {
@@ -91,14 +109,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      await ApiService.buatPaketGudang({
-        'namaPenerima': _namaController.text.trim(),
-        'alamatTujuan': _alamatController.text.trim(),
-        'kotaAsal': 'Surabaya',
-        'kotaTujuan': 'Surabaya',
-        'berat': _beratVal,
-        'jenisPaket': _isExpress ? 'Express' : 'Reguler',
-      });
+      await ApiService.buatPaketGudang(
+        namaPenerima: _namaController.text.trim(),
+        alamatAsal: 'DC Surabaya',
+        alamatTujuan: _alamatController.text.trim(),
+        beratKg: _beratVal,
+        jenisPaket: _isExpress ? 'Express' : 'Reguler',
+      );
 
       _namaController.clear();
       _alamatController.clear();
@@ -121,7 +138,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     try {
       await ApiService.assignKurir(
         noResi: _selectedResiForAction!,
-        kurirId: _selectedKurirId!,
+        idKurir: _selectedKurirId!,
       );
       _showSnack('Kurir berhasil ditugaskan untuk $_selectedResiForAction!');
       await _loadData();
@@ -142,7 +159,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     try {
       await ApiService.tambahTransit(
         noResi: _selectedResiForAction!,
-        lokasi: _selectedTransit,
+        lokasiUpdate: _selectedTransit,
       );
       _showSnack('Titik transit $_selectedTransit berhasil ditambahkan!');
       await _loadData();
@@ -166,14 +183,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final filteredPaket = _daftarPaket.where((p) {
-      final resi = (p['nomorResi'] ?? '').toString().toLowerCase();
+      final resi = (p['noResi'] ?? '').toString().toLowerCase();
       final penerima = (p['namaPenerima'] ?? '').toString().toLowerCase();
       return resi.contains(_searchQuery.toLowerCase()) ||
           penerima.contains(_searchQuery.toLowerCase());
     }).toList();
 
     final menungguCount = _daftarPaket.where((p) {
-      final status = (p['status'] ?? '').toString().toLowerCase();
+      final status = (p['statusTerkini'] ?? '').toString().toLowerCase();
       return status.contains('menunggu') || status.contains('proses');
     }).length;
 
@@ -209,7 +226,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-    Widget _buildBodyByTab(
+  Widget _buildBodyByTab(
       List<Map<String, dynamic>> filteredPaket, int menungguCount) {
     switch (_selectedNavIndex) {
       case 1:
@@ -237,7 +254,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               const Text('Belum ada data kurir terdaftar.'),
             ..._daftarKurir.map((k) {
               final tersedia = k['statusKetersediaan'] == true ||
-                  k['status_ketersediaan'] == 1;
+                  k['statusKetersediaan'] == 1;
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
@@ -252,13 +269,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          (k['namaLengkap'] ?? k['nama'] ?? 'Kurir').toString(),
+                          (k['namaLengkap'] ?? 'Kurir').toString(),
                           style: const TextStyle(
                               fontWeight: FontWeight.w800, fontSize: 15),
                         ),
                         Text(
-                          (k['platKendaraan'] ?? k['plat_kendaraan'] ?? '-')
-                              .toString(),
+                          (k['platKendaraan'] ?? '-').toString(),
                           style: const TextStyle(
                               color: AppColors.textSecondary, fontSize: 12),
                         ),
@@ -714,9 +730,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       isExpanded: true,
                       items: _daftarPaket
                           .map((p) => DropdownMenuItem<String>(
-                                value: p['nomorResi'].toString(),
+                                value: p['noResi'].toString(),
                                 child: Text(
-                                    '${p['nomorResi']} · ${p['namaPenerima']}'),
+                                    '${p['noResi']} · ${p['namaPenerima']}'),
                               ))
                           .toList(),
                       onChanged: (v) =>
@@ -738,9 +754,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       isExpanded: true,
                       items: _daftarKurir
                           .map((k) => DropdownMenuItem<int>(
-                                value: int.tryParse(k['id'].toString()),
+                                value: int.tryParse(k['idPengguna'].toString()),
                                 child: Text(
-                                    '${k['namaLengkap'] ?? k['nama']} (${k['platKendaraan'] ?? '-'})'),
+                                    '${k['namaLengkap'] ?? 'Kurir'} (${k['platKendaraan'] ?? '-'})'),
                               ))
                           .toList(),
                       onChanged: (v) => setState(() => _selectedKurirId = v),
@@ -877,7 +893,8 @@ class _AdminPaketCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = (paket['status'] ?? 'Menunggu Penjemputan').toString();
+    final status =
+        (paket['statusTerkini'] ?? 'Menunggu Penjemputan').toString();
     final isPerjalanan = status.toLowerCase().contains('perjalanan') ||
         status.toLowerCase().contains('antar');
 
@@ -897,7 +914,7 @@ class _AdminPaketCard extends StatelessWidget {
                   size: 16, color: AppColors.navyPrimary),
               const SizedBox(width: 6),
               Text(
-                (paket['nomorResi'] ?? '-').toString(),
+                (paket['noResi'] ?? '-').toString(),
                 style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
@@ -979,7 +996,8 @@ class _ServiceChoiceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.navyPrimary : Colors.white,

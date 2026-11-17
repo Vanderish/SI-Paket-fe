@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/api_service.dart';
+import '../../widgets/animated_components.dart';
 import '../role_selection_screen.dart';
 
 class KurirTugasScreen extends StatefulWidget {
@@ -66,7 +67,9 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
       if (!mounted) return;
       setState(() => _isTersedia = target);
       _showSnack(
-        target ? 'Status diubah menjadi Aktif' : 'Status diubah menjadi Istirahat',
+        target
+            ? 'Status diubah menjadi Aktif'
+            : 'Status diubah menjadi Istirahat',
       );
     } catch (e) {
       _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
@@ -90,7 +93,8 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
 
   Future<void> _updateLokasiDialog(String noResi) async {
     final lokasiCtrl = TextEditingController(text: 'Keputih, Surabaya');
-    final ketCtrl = TextEditingController(text: 'Kurir sedang menuju alamat penerima');
+    final ketCtrl =
+        TextEditingController(text: 'Kurir sedang menuju alamat penerima');
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -134,10 +138,10 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
     try {
       await ApiService.kurirUpdateLokasi(
         noResi: noResi,
-        lokasi: lokasiCtrl.text.trim(),
-        keterangan: ketCtrl.text.trim(),
+        lokasiUpdate: lokasiCtrl.text.trim(),
+        deskripsiStatus: ketCtrl.text.trim(),
       );
-      _showSnack('Titik lokasi GPS berhasil diperbarui!');
+      _showSnack('Titik lokasi pengiriman berhasil diperbarui!');
       await _loadTugas();
     } catch (e) {
       _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
@@ -164,7 +168,7 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+      SmoothPageRoute(page: const RoleSelectionScreen()),
       (route) => false,
     );
   }
@@ -177,10 +181,10 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
   @override
   Widget build(BuildContext context) {
     final aktifList = _daftarTugas
-        .where((p) => !_isStatusSelesai((p['status'] ?? '').toString()))
+        .where((p) => !_isStatusSelesai((p['statusTerkini'] ?? '').toString()))
         .toList();
     final selesaiList = _daftarTugas
-        .where((p) => _isStatusSelesai((p['status'] ?? '').toString()))
+        .where((p) => _isStatusSelesai((p['statusTerkini'] ?? '').toString()))
         .toList();
 
     final displayed = _showAktif ? aktifList : selesaiList;
@@ -203,7 +207,6 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Header Kurir
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -229,10 +232,11 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
                                   ),
                                 ],
                               ),
-                              GestureDetector(
+                              BouncyTap(
                                 onTap:
                                     _isSubmitting ? null : _toggleKetersediaan,
-                                child: Container(
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 220),
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(
@@ -268,69 +272,70 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
                             ],
                           ),
                           const SizedBox(height: 20),
-
-                          // Progress Card Navy
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: AppColors.navyPrimary,
-                              borderRadius: BorderRadius.circular(22),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      '${selesaiList.length} / ${_daftarTugas.length}',
-                                      style: const TextStyle(
-                                        fontSize: 32,
-                                        fontWeight: FontWeight.w800,
-                                        color: AppColors.yellowAccent,
+                          FadeSlideIn(
+                            delayMs: 60,
+                            child: Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: AppColors.navyPrimary,
+                                borderRadius: BorderRadius.circular(22),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        '${selesaiList.length} / ${_daftarTugas.length}',
+                                        style: const TextStyle(
+                                          fontSize: 32,
+                                          fontWeight: FontWeight.w800,
+                                          color: AppColors.yellowAccent,
+                                        ),
                                       ),
-                                    ),
-                                    const Text(
-                                      'paket terkirim\nhari ini',
-                                      textAlign: TextAlign.right,
-                                      style: TextStyle(
-                                          color: Colors.white70, fontSize: 13),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 14),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: LinearProgressIndicator(
-                                    value: selesaiList.length / totalSemua,
-                                    minHeight: 6,
-                                    backgroundColor: Colors.white24,
-                                    valueColor: const AlwaysStoppedAnimation(
-                                        AppColors.yellowAccent),
+                                      const Text(
+                                        'paket terkirim\nhari ini',
+                                        textAlign: TextAlign.right,
+                                        style: TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 13),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      '${aktifList.length} pengiriman tersisa',
-                                      style: const TextStyle(
-                                          color: Colors.white70, fontSize: 12),
+                                  const SizedBox(height: 14),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: LinearProgressIndicator(
+                                      value: selesaiList.length / totalSemua,
+                                      minHeight: 6,
+                                      backgroundColor: Colors.white24,
+                                      valueColor: const AlwaysStoppedAnimation(
+                                          AppColors.yellowAccent),
                                     ),
-                                    const Icon(Icons.local_shipping_outlined,
-                                        color: AppColors.yellowAccent,
-                                        size: 18),
-                                  ],
-                                ),
-                              ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        '${aktifList.length} pengiriman tersisa',
+                                        style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 12),
+                                      ),
+                                      const Icon(Icons.local_shipping_outlined,
+                                          color: AppColors.yellowAccent,
+                                          size: 18),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                           const SizedBox(height: 18),
-
-                          // Filter Tabs Aktif vs Selesai
                           Row(
                             children: [
                               Expanded(
@@ -353,7 +358,6 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
                             ],
                           ),
                           const SizedBox(height: 18),
-
                           if (displayed.isEmpty)
                             const Center(
                               child: Padding(
@@ -366,7 +370,12 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
                               ),
                             )
                           else
-                            ...displayed.map((paket) => _buildTaskCard(paket)),
+                            ...displayed.asMap().entries.map(
+                                  (entry) => FadeSlideIn(
+                                    delayMs: 80 + (entry.key * 70),
+                                    child: _buildTaskCard(entry.value),
+                                  ),
+                                ),
                         ],
                       ),
                     ),
@@ -395,12 +404,13 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
   }
 
   Widget _buildTaskCard(Map<String, dynamic> paket) {
-    final noResi = (paket['nomorResi'] ?? '-').toString();
+    final noResi = (paket['noResi'] ?? '-').toString();
     final penerima = (paket['namaPenerima'] ?? '-').toString();
     final alamat = (paket['alamatTujuan'] ?? '-').toString();
     final jenis = (paket['jenisPaket'] ?? 'Reguler').toString();
-    final berat = (paket['berat'] ?? '1').toString();
-    final status = (paket['status'] ?? 'Menunggu Penjemputan').toString();
+    final berat = (paket['beratKg'] ?? '1').toString();
+    final status =
+        (paket['statusTerkini'] ?? 'Menunggu Penjemputan').toString();
     final statusLower = status.toLowerCase();
 
     final isBaru =
@@ -638,7 +648,8 @@ class _TabButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
         height: 44,
         alignment: Alignment.center,
         decoration: BoxDecoration(

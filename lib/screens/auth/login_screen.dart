@@ -1,34 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
+import '../../services/api_service.dart';
 import '../admin/admin_home_screen.dart';
 import '../kurir/kurir_tugas_screen.dart';
 import '../pelanggan/pelanggan_main_screen.dart';
-
-
-class _ApiServiceShim {
-  const _ApiServiceShim();
-
-  Future<Map<String, dynamic>> login({
-    required String email,
-    required String password,
-  }) async {
-    throw UnimplementedError('ApiService.login is not available in this build.');
-  }
-
-  Future<void> register({
-    required String email,
-    required String password,
-    required String role,
-    required String namaLengkap,
-    String? noTelp,
-    String? lokasiPos,
-    String? platKendaraan,
-  }) async {
-    throw UnimplementedError('ApiService.register is not available in this build.');
-  }
-}
-
-final ApiService = _ApiServiceShim();
 
 class LoginScreen extends StatefulWidget {
   final String initialRole; // 'PetugasGudang', 'Kurir', atau 'User'
@@ -47,7 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _namaController = TextEditingController();
-  final _extraFieldController = TextEditingController(); // noTelp / lokasiPos / platKendaraan
+  final _extraFieldController = TextEditingController();
 
   String get _roleLabel {
     switch (widget.initialRole) {
@@ -104,8 +79,9 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
+      Map<String, dynamic> authData;
       if (_isRegisterMode) {
-        await ApiService.register(
+        authData = await ApiService.register(
           email: email,
           password: password,
           role: widget.initialRole,
@@ -120,14 +96,18 @@ class _LoginScreenState extends State<LoginScreen> {
               ? _extraFieldController.text.trim()
               : null,
         );
+        // Jika register tidak mengembalikan token langsung, lanjut login otomatis
+        if ((authData['token'] ?? '').toString().isEmpty) {
+          authData = await ApiService.login(email: email, password: password);
+        }
+      } else {
+        authData = await ApiService.login(
+          email: email,
+          password: password,
+        );
       }
 
-      final loginData = await ApiService.login(
-        email: email,
-        password: password,
-      );
-
-      final actualRole = loginData['role']?.toString() ?? widget.initialRole;
+      final actualRole = authData['role']?.toString() ?? widget.initialRole;
       if (!mounted) return;
       _navigateToDashboard(actualRole);
     } catch (e) {
@@ -168,6 +148,22 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.yellowSoft,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  'PERAN: ${_roleLabel.toUpperCase()}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.yellowText,
+                  ),
+                ),
+              ),
               const SizedBox(height: 14),
               Text(
                 _isRegisterMode ? 'Buat akun baru.' : 'Selamat datang kembali.',
@@ -188,10 +184,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 28),
-
               if (_isRegisterMode) ...[
                 const Text('Nama Lengkap',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 6),
                 _buildTextField(
                   controller: _namaController,
@@ -200,7 +196,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 14),
               ],
-
               const Text('Email',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
               const SizedBox(height: 6),
@@ -211,7 +206,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 14),
-
               const Text('Password',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
               const SizedBox(height: 6),
@@ -240,7 +234,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-
               if (_isRegisterMode) ...[
                 const SizedBox(height: 14),
                 Text(_extraFieldLabel,
@@ -253,7 +246,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   icon: Icons.badge_outlined,
                 ),
               ],
-
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
@@ -284,8 +276,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-
-              // Toggle Login <-> Register
               Center(
                 child: TextButton(
                   onPressed: () =>
@@ -301,8 +291,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-
-              // Opsi Lacak Publik khusus User/Pelanggan
               if (widget.initialRole == 'User') ...[
                 const Divider(height: 32),
                 SizedBox(
