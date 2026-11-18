@@ -221,24 +221,8 @@ class ApiService {
 
   // 3. OPERASIONAL GUDANG
 
-  static Future<List<dynamic>> getGudangPaket({
-    String? status,
-    String? jenisPaket,
-  }) async {
-    final headers = await _authHeaders();
-    final uri = Uri.parse('$baseUrl/gudang/paket').replace(
-      queryParameters: {
-        if (status != null && status.isNotEmpty) 'status': status,
-        if (jenisPaket != null && jenisPaket.isNotEmpty)
-          'jenis_paket': jenisPaket,
-      },
-    );
-    final res = await http.get(uri, headers: headers);
-    final data = _parseResponse(res);
-    return data is List ? data : (data['data'] as List? ?? []);
-  }
-
   static Future<Map<String, dynamic>> buatPaketGudang({
+    required int idPengguna,
     required String namaPenerima,
     required String alamatAsal,
     required String alamatTujuan,
@@ -247,20 +231,30 @@ class ApiService {
     int? idKurir,
   }) async {
     final headers = await _authHeaders();
-    final userId = await getUserId() ?? 1;
     final res = await http.post(
       Uri.parse('$baseUrl/gudang/paket'),
       headers: headers,
       body: jsonEncode({
-        'idPengguna': userId,
+        'idPengguna': idPengguna,
+        'id_pengguna': idPengguna,
         'namaPenerima': namaPenerima,
+        'nama_penerima': namaPenerima,
         'alamatAsal': alamatAsal,
+        'alamat_asal': alamatAsal,
         'alamatTujuan': alamatTujuan,
+        'alamat_tujuan': alamatTujuan,
         'beratKg': beratKg,
+        'berat_kg': beratKg,
         'jenisPaket': jenisPaket,
-        'idKurir': ?idKurir,
+        'jenis_paket': jenisPaket,
+        if (idKurir != null) ...{
+          'idKurir': idKurir,
+          'id_kurir': idKurir,
+        },
       }),
     );
+    // ignore: avoid_print
+    print('BUAT PAKET GUDANG [${res.statusCode}]: ${res.body}');
     return _parseResponse(res) as Map<String, dynamic>;
   }
 
@@ -387,4 +381,6 @@ class ApiService {
     final res = await http.get(Uri.parse('$baseUrl/tracking/$noResi'));
     return _parseResponse(res) as Map<String, dynamic>;
   }
+
+  static Future<dynamic> getGudangPaket() async {}
 }

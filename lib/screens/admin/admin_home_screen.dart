@@ -18,6 +18,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   List<Map<String, dynamic>> _daftarPaket = [];
   List<Map<String, dynamic>> _daftarKurir = [];
 
+  final _idPelangganController = TextEditingController(text: '1');
   final _namaController = TextEditingController();
   final _alamatController = TextEditingController();
   final _beratController = TextEditingController(text: '2.4');
@@ -101,32 +102,35 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Future<void> _simpanPaketBaru() async {
-    if (_namaController.text.trim().isEmpty ||
-        _alamatController.text.trim().isEmpty) {
-      _showSnack('Isi nama penerima dan alamat tujuan dulu!', isError: true);
-      return;
-    }
-
-    setState(() => _isSubmitting = true);
-    try {
-      await ApiService.buatPaketGudang(
-        namaPenerima: _namaController.text.trim(),
-        alamatAsal: 'DC Surabaya',
-        alamatTujuan: _alamatController.text.trim(),
-        beratKg: _beratVal,
-        jenisPaket: _isExpress ? 'Express' : 'Reguler',
-      );
-
-      _namaController.clear();
-      _alamatController.clear();
-      _showSnack('Paket baru & resi berhasil disimpan ke database!');
-      await _loadData();
-    } catch (e) {
-      _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
+  final idPelanggan = int.tryParse(_idPelangganController.text.trim());
+  if (idPelanggan == null ||
+      _namaController.text.trim().isEmpty ||
+      _alamatController.text.trim().isEmpty) {
+    _showSnack('Isi ID pelanggan, nama penerima, dan alamat tujuan dulu!', isError: true);
+    return;
   }
+
+  setState(() => _isSubmitting = true);
+  try {
+    await ApiService.buatPaketGudang(
+      idPengguna: idPelanggan,
+      namaPenerima: _namaController.text.trim(),
+      alamatAsal: 'DC Surabaya',
+      alamatTujuan: _alamatController.text.trim(),
+      beratKg: _beratVal,
+      jenisPaket: _isExpress ? 'Express' : 'Reguler',
+    );
+
+    _namaController.clear();
+    _alamatController.clear();
+    _showSnack('Paket baru & resi berhasil disimpan ke database!');
+    await _loadData();
+  } catch (e) {
+    _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
+  } finally {
+    if (mounted) setState(() => _isSubmitting = false);
+  }
+}
 
   Future<void> _tugaskanKurir() async {
     if (_selectedResiForAction == null || _selectedKurirId == null) {
@@ -378,7 +382,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'ADMIN POS / SURABAYA',
+                        'ADMIN POS',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -535,6 +539,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         color: AppColors.textSecondary,
                       ),
                     ),
+                    const Text('ID Pelanggan (Pengirim)',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    _buildInputField(_idPelangganController, 'Contoh: 2'),
+                    const SizedBox(height: 12),
                     const SizedBox(height: 16),
                     const Text('Nama penerima',
                         style: TextStyle(
