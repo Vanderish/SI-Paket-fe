@@ -6,7 +6,7 @@ import '../kurir/kurir_tugas_screen.dart';
 import '../pelanggan/pelanggan_main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  final String initialRole; // 'PetugasGudang', 'Kurir', atau 'User'
+  final String initialRole; // 3 role
 
   const LoginScreen({super.key, required this.initialRole});
 
@@ -96,7 +96,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ? _extraFieldController.text.trim()
               : null,
         );
-        // Jika register tidak mengembalikan token langsung, lanjut login otomatis
+        // regis
         if ((authData['token'] ?? '').toString().isEmpty) {
           authData = await ApiService.login(email: email, password: password);
         }

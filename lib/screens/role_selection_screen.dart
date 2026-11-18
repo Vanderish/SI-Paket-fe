@@ -46,7 +46,7 @@ class RoleSelectionScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // Ilustrasi Hero Card dengan Floating Micro-Interactions
+              // hero card
               FadeSlideIn(
                 delayMs: 120,
                 child: Container(
@@ -162,7 +162,6 @@ class RoleSelectionScreen extends StatelessWidget {
               ),
               const SizedBox(height: 28),
 
-              // Headline & Subheadline
               const FadeSlideIn(
                 delayMs: 200,
                 child: Column(
@@ -204,7 +203,6 @@ class RoleSelectionScreen extends StatelessWidget {
               ),
               const SizedBox(height: 14),
 
-              // 3 Pilihan Role Cards dengan Staggered Delay + BouncyTap
               FadeSlideIn(
                 delayMs: 320,
                 child: _RoleOptionCard(

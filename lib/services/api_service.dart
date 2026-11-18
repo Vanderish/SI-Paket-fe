@@ -74,9 +74,7 @@ class ApiService {
     throw Exception(errorMsg);
   }
 
-  // =========================================================
   // 1. AUTENTIKASI & MANAJEMEN PENGGUNA
-  // =========================================================
 
   static Future<Map<String, dynamic>> register({
     required String email,
@@ -157,9 +155,7 @@ class ApiService {
     return _parseResponse(res) as Map<String, dynamic>;
   }
 
-  // =========================================================
   // 2. LAYANAN PAKET & PEMESANAN
-  // =========================================================
 
   static Future<Map<String, dynamic>> cekOngkir({
     required String alamatAsal,
@@ -223,9 +219,7 @@ class ApiService {
     return _parseResponse(res) as Map<String, dynamic>;
   }
 
-  // =========================================================
   // 3. OPERASIONAL GUDANG
-  // =========================================================
 
   static Future<List<dynamic>> getGudangPaket({
     String? status,
@@ -303,9 +297,7 @@ class ApiService {
     _parseResponse(res);
   }
 
-  // =========================================================
   // 4. OPERASIONAL KURIR
-  // =========================================================
 
   static Future<List<dynamic>> getDaftarKurir({bool? tersedia}) async {
     final headers = await _authHeaders();
@@ -389,9 +381,7 @@ class ApiService {
     _parseResponse(res);
   }
 
-  // =========================================================
   // 5. PELACAKAN RESI PUBLIK
-  // =========================================================
 
   static Future<Map<String, dynamic>> trackPaketPublic(String noResi) async {
     final res = await http.get(Uri.parse('$baseUrl/tracking/$noResi'));

@@ -22,13 +22,12 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
 
-    // 1. Pergerakan mobil box melintas lebih santai (4.5 detik total)
+    // 1. Mobil
     _driveController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 4500),
     );
 
-    // Masuk dari kiri -> berhenti sebentar di tengah -> tancap gas ke kanan
     _truckPosition = TweenSequence<double>([
       TweenSequenceItem(
         tween: Tween<double>(begin: -0.35, end: 0.49)
@@ -83,7 +82,7 @@ class _SplashScreenState extends State<SplashScreen>
           children: [
             const Spacer(flex: 2),
 
-            // Brand Title minimalis di atas
+            // si paket
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -116,7 +115,6 @@ class _SplashScreenState extends State<SplashScreen>
 
             const Spacer(flex: 1),
 
-            // Area Jalan & Mobil Box Melintas
             SizedBox(
               height: 150,
               width: double.infinity,
