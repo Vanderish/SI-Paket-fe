@@ -6,7 +6,7 @@ import '../kurir/kurir_tugas_screen.dart';
 import '../pelanggan/pelanggan_main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  final String initialRole; // 3 role
+  final String initialRole; // 'User', 'PetugasGudang', atau 'Kurir'
 
   const LoginScreen({super.key, required this.initialRole});
 
@@ -23,6 +23,15 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _namaController = TextEditingController();
   final _extraFieldController = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _namaController.dispose();
+    _extraFieldController.dispose();
+    super.dispose();
+  }
 
   String get _roleLabel {
     switch (widget.initialRole) {
@@ -46,7 +55,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _navigateToDashboard(String role) {
+  void _navigateToDashboard(String role, {bool clearStack = true}) {
     Widget destination;
     if (role == 'PetugasGudang') {
       destination = const AdminHomeScreen();
@@ -56,10 +65,36 @@ class _LoginScreenState extends State<LoginScreen> {
       destination = const PelangganMainScreen();
     }
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => destination),
-    );
+    if (clearStack) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => destination),
+        (route) => false,
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => destination),
+      );
+    }
+  }
+
+  String _extractToken(Map<String, dynamic> authData) {
+    final inner = (authData['data'] is Map<String, dynamic>)
+        ? authData['data'] as Map<String, dynamic>
+        : authData;
+    return (inner['token'] ?? authData['token'] ?? '').toString();
+  }
+
+  String _extractRole(Map<String, dynamic> authData) {
+    final inner = (authData['data'] is Map<String, dynamic>)
+        ? authData['data'] as Map<String, dynamic>
+        : authData;
+    final userObj = (inner['user'] is Map<String, dynamic>)
+        ? inner['user'] as Map<String, dynamic>
+        : inner;
+    final role = (userObj['role'] ?? inner['role'] ?? '').toString();
+    return role.isNotEmpty ? role : widget.initialRole;
   }
 
   Future<void> _submit() async {
@@ -96,8 +131,9 @@ class _LoginScreenState extends State<LoginScreen> {
               ? _extraFieldController.text.trim()
               : null,
         );
-        // regis
-        if ((authData['token'] ?? '').toString().isEmpty) {
+
+        // Jika endpoint register tidak langsung mengembalikan token, otomatis login
+        if (_extractToken(authData).isEmpty) {
           authData = await ApiService.login(email: email, password: password);
         }
       } else {
@@ -107,9 +143,9 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
 
-      final actualRole = authData['role']?.toString() ?? widget.initialRole;
+      final actualRole = _extractRole(authData);
       if (!mounted) return;
-      _navigateToDashboard(actualRole);
+      _navigateToDashboard(actualRole, clearStack: true);
     } catch (e) {
       if (!mounted) return;
       _showError(e.toString().replaceFirst('Exception: ', ''));
@@ -297,7 +333,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   width: double.infinity,
                   height: 48,
                   child: OutlinedButton.icon(
-                    onPressed: () => _navigateToDashboard('User'),
+                    onPressed: () =>
+                        _navigateToDashboard('User', clearStack: false),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.navyPrimary,
                       side: const BorderSide(color: AppColors.borderLight),

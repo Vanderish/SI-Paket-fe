@@ -87,13 +87,22 @@ class ApiService {
   }) async {
     final payload = <String, dynamic>{
       'namaLengkap': namaLengkap,
+      'nama_lengkap': namaLengkap,
       'email': email,
       'password': password,
       'role': role,
-      if (noTelp != null && noTelp.isNotEmpty) 'noTelp': noTelp,
-      if (lokasiPos != null && lokasiPos.isNotEmpty) 'lokasiPos': lokasiPos,
-      if (platKendaraan != null && platKendaraan.isNotEmpty)
+      if (noTelp != null && noTelp.isNotEmpty) ...{
+        'noTelp': noTelp,
+        'no_telp': noTelp,
+      },
+      if (lokasiPos != null && lokasiPos.isNotEmpty) ...{
+        'lokasiPos': lokasiPos,
+        'lokasi_pos': lokasiPos,
+      },
+      if (platKendaraan != null && platKendaraan.isNotEmpty) ...{
         'platKendaraan': platKendaraan,
+        'plat_kendaraan': platKendaraan,
+      },
     };
 
     final res = await http.post(
@@ -121,16 +130,29 @@ class ApiService {
   }
 
   static Future<void> _saveAuthResponse(
-      Map<String, dynamic> data, String fallbackEmail) async {
-    final token = data['token']?.toString() ?? '';
-    final role = data['role']?.toString() ?? '';
-    final nama = data['namaLengkap']?.toString() ?? fallbackEmail;
-    final userId = int.tryParse(data['userId']?.toString() ?? '');
+      Map<String, dynamic> raw, String fallbackEmail) async {
+    final inner = (raw['data'] is Map<String, dynamic>)
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    final userObj = (inner['user'] is Map<String, dynamic>)
+        ? inner['user'] as Map<String, dynamic>
+        : inner;
+
+    final token = (inner['token'] ?? raw['token'] ?? '').toString();
+    final role = (userObj['role'] ?? inner['role'] ?? '').toString();
+    final nama = (userObj['namaLengkap'] ??
+            userObj['nama_lengkap'] ??
+            fallbackEmail)
+        .toString();
+    final rawId =
+        userObj['idPengguna'] ?? userObj['id_pengguna'] ?? userObj['userId'];
+    final userId = int.tryParse(rawId?.toString() ?? '');
+
     if (token.isNotEmpty) {
       await saveSession(
         token: token,
         role: role,
-        email: data['email']?.toString() ?? fallbackEmail,
+        email: (userObj['email'] ?? fallbackEmail).toString(),
         userId: userId,
         namaLengkap: nama,
       );
@@ -168,9 +190,13 @@ class ApiService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'alamatAsal': alamatAsal,
+        'alamat_asal': alamatAsal,
         'alamatTujuan': alamatTujuan,
+        'alamat_tujuan': alamatTujuan,
         'beratKg': beratKg,
+        'berat_kg': beratKg,
         'jenisPaket': jenisPaket,
+        'jenis_paket': jenisPaket,
       }),
     );
     return _parseResponse(res) as Map<String, dynamic>;
@@ -189,10 +215,15 @@ class ApiService {
       headers: headers,
       body: jsonEncode({
         'namaPenerima': namaPenerima,
+        'nama_penerima': namaPenerima,
         'alamatAsal': alamatAsal,
+        'alamat_asal': alamatAsal,
         'alamatTujuan': alamatTujuan,
+        'alamat_tujuan': alamatTujuan,
         'beratKg': beratKg,
+        'berat_kg': beratKg,
         'jenisPaket': jenisPaket,
+        'jenis_paket': jenisPaket,
       }),
     );
     return _parseResponse(res) as Map<String, dynamic>;
@@ -220,6 +251,23 @@ class ApiService {
   }
 
   // 3. OPERASIONAL GUDANG
+
+  static Future<List<dynamic>> getGudangPaket({
+    String? status,
+    String? jenisPaket,
+  }) async {
+    final headers = await _authHeaders();
+    final uri = Uri.parse('$baseUrl/gudang/paket').replace(
+      queryParameters: {
+        if (status != null && status.isNotEmpty) 'status': status,
+        if (jenisPaket != null && jenisPaket.isNotEmpty)
+          'jenis_paket': jenisPaket,
+      },
+    );
+    final res = await http.get(uri, headers: headers);
+    final data = _parseResponse(res);
+    return data is List ? data : (data['data'] as List? ?? []);
+  }
 
   static Future<Map<String, dynamic>> buatPaketGudang({
     required int idPengguna,
@@ -381,6 +429,4 @@ class ApiService {
     final res = await http.get(Uri.parse('$baseUrl/tracking/$noResi'));
     return _parseResponse(res) as Map<String, dynamic>;
   }
-
-  static Future<dynamic> getGudangPaket() async {}
 }

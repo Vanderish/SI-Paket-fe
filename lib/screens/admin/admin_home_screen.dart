@@ -36,12 +36,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     _loadData();
   }
 
+  
+
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final nama = await ApiService.getNama();
-      final paketRaw = await ApiService.getGudangPaket();
+      final paketRaw = await ApiService.getPaketSaya();
       final kurirRaw = await ApiService.getDaftarKurir();
+      final nama = await ApiService.getNama();
 
       final paketList = paketRaw
           .map((item) => Map<String, dynamic>.from(item as Map))

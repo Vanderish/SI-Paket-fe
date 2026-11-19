@@ -1,7 +1,11 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
+import '../services/api_service.dart';
 import '../widgets/animated_components.dart';
+import 'admin/admin_home_screen.dart';
+import 'kurir/kurir_tugas_screen.dart';
+import 'pelanggan/pelanggan_main_screen.dart';
 import 'role_selection_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -56,12 +60,34 @@ class _SplashScreenState extends State<SplashScreen>
 
     _driveController.addStatusListener((status) {
       if (status == AnimationStatus.completed && mounted) {
-        Navigator.pushReplacement(
-          context,
-          SmoothPageRoute(page: const RoleSelectionScreen()),
-        );
+        _navigateAfterSplash();
       }
     });
+  }
+
+  Future<void> _navigateAfterSplash() async {
+    final token = await ApiService.getToken();
+    final role = await ApiService.getRole();
+
+    if (!mounted) return;
+
+    Widget nextPage;
+    if (token != null && token.isNotEmpty) {
+      if (role == 'PetugasGudang') {
+        nextPage = const AdminHomeScreen();
+      } else if (role == 'Kurir') {
+        nextPage = const KurirTugasScreen();
+      } else {
+        nextPage = const PelangganMainScreen();
+      }
+    } else {
+      nextPage = const RoleSelectionScreen();
+    }
+
+    Navigator.pushReplacement(
+      context,
+      SmoothPageRoute(page: nextPage),
+    );
   }
 
   @override
