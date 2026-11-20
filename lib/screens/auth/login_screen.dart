@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rive/rive.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/api_service.dart';
 import '../admin/admin_home_screen.dart';
@@ -24,13 +25,69 @@ class _LoginScreenState extends State<LoginScreen> {
   final _namaController = TextEditingController();
   final _extraFieldController = TextEditingController();
 
+  // FocusNode untuk memicu animasi mata & tutup mata karakter
+  final _emailFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
+  final _namaFocusNode = FocusNode();
+
+  // Controller State Machine Rive (Auth Teddy)
+  StateMachineController? _riveController;
+  SMIBool? _isFocus;
+  SMINumber? _numLook;
+  SMIBool? _isPrivateField;
+  SMIBool? _isPrivateFieldShow;
+  SMITrigger? _successTrigger;
+  SMITrigger? _failTrigger;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _emailFocusNode.addListener(() {
+      _isFocus?.change(_emailFocusNode.hasFocus);
+    });
+
+    _namaFocusNode.addListener(() {
+      _isFocus?.change(_namaFocusNode.hasFocus);
+    });
+
+    _passwordFocusNode.addListener(() {
+      _isPrivateField?.change(_passwordFocusNode.hasFocus);
+      if (_passwordFocusNode.hasFocus) {
+        _isPrivateFieldShow?.change(!_obscurePassword);
+      } else {
+        _isPrivateFieldShow?.change(false);
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _riveController?.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _namaController.dispose();
     _extraFieldController.dispose();
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
+    _namaFocusNode.dispose();
     super.dispose();
+  }
+
+  void _onRiveInit(Artboard artboard) {
+    final controller =
+        StateMachineController.fromArtboard(artboard, 'Login Machine');
+    if (controller == null) return;
+
+    artboard.addController(controller);
+    _riveController = controller;
+
+    _isFocus = controller.getBoolInput('isFocus');
+    _numLook = controller.getNumberInput('numLook');
+    _isPrivateField = controller.getBoolInput('isPrivateField');
+    _isPrivateFieldShow = controller.getBoolInput('isPrivateFieldShow');
+    _successTrigger = controller.getTriggerInput('successTrigger');
+    _failTrigger = controller.getTriggerInput('failTrigger');
   }
 
   String get _roleLabel {
@@ -98,15 +155,19 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
+
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
+      _failTrigger?.fire();
       _showError('Email dan password wajib diisi.');
       return;
     }
 
     if (_isRegisterMode && _namaController.text.trim().isEmpty) {
+      _failTrigger?.fire();
       _showError('Nama lengkap wajib diisi.');
       return;
     }
@@ -132,7 +193,6 @@ class _LoginScreenState extends State<LoginScreen> {
               : null,
         );
 
-        // Jika endpoint register tidak langsung mengembalikan token, otomatis login
         if (_extractToken(authData).isEmpty) {
           authData = await ApiService.login(email: email, password: password);
         }
@@ -143,10 +203,15 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
 
+      // Mainkan ekspresi senang sebelum pindah ke dashboard
+      _successTrigger?.fire();
+      await Future.delayed(const Duration(milliseconds: 700));
+
       final actualRole = _extractRole(authData);
       if (!mounted) return;
       _navigateToDashboard(actualRole, clearStack: true);
     } catch (e) {
+      _failTrigger?.fire();
       if (!mounted) return;
       _showError(e.toString().replaceFirst('Exception: ', ''));
     } finally {
@@ -180,10 +245,32 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // KARTU KARAKTER RIVE DENGAN TEMA NAVY & KUNING SI-PAKET
+              Container(
+                width: double.infinity,
+                height: 175,
+                decoration: BoxDecoration(
+                  color: AppColors.navyPrimary,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: AppColors.yellowAccent,
+                    width: 2,
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: RiveAnimation.asset(
+                    'assets/animations/auth_teddy.riv',
+                    fit: BoxFit.contain,
+                    onInit: _onRiveInit,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -200,58 +287,70 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               Text(
                 _isRegisterMode ? 'Buat akun baru.' : 'Selamat datang kembali.',
                 style: const TextStyle(
-                  fontSize: 28,
+                  fontSize: 26,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 _isRegisterMode
                     ? 'Daftarkan akun $_roleLabel untuk mulai menggunakan SI-PAKET.'
                     : 'Masuk dengan akun $_roleLabel Anda yang terdaftar.',
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: 13,
                   color: AppColors.textSecondary,
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 22),
               if (_isRegisterMode) ...[
-                const Text('Nama Lengkap',
-                    style:
-                        TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                const Text(
+                  'Nama Lengkap',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
                 const SizedBox(height: 6),
                 _buildTextField(
                   controller: _namaController,
+                  focusNode: _namaFocusNode,
                   hint: 'Masukkan nama lengkap',
                   icon: Icons.person_outline,
+                  onChanged: (val) => _numLook?.change(val.length * 1.5),
                 ),
                 const SizedBox(height: 14),
               ],
-              const Text('Email',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              const Text(
+                'Email',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 6),
               _buildTextField(
                 controller: _emailController,
+                focusNode: _emailFocusNode,
                 hint: 'nama@email.com',
                 icon: Icons.email_outlined,
                 keyboardType: TextInputType.emailAddress,
+                onChanged: (val) => _numLook?.change(val.length * 1.5),
               ),
               const SizedBox(height: 14),
-              const Text('Password',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              const Text(
+                'Password',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 6),
               TextField(
                 controller: _passwordController,
+                focusNode: _passwordFocusNode,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   hintText: '••••••••',
-                  prefixIcon: const Icon(Icons.lock_outline,
-                      color: AppColors.textSecondary),
+                  prefixIcon: const Icon(
+                    Icons.lock_outline,
+                    color: AppColors.textSecondary,
+                  ),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscurePassword
@@ -259,8 +358,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           : Icons.visibility_outlined,
                       color: AppColors.textSecondary,
                     ),
-                    onPressed: () =>
-                        setState(() => _obscurePassword = !_obscurePassword),
+                    onPressed: () {
+                      setState(() => _obscurePassword = !_obscurePassword);
+                      _passwordFocusNode.requestFocus();
+                      _isPrivateFieldShow?.change(!_obscurePassword);
+                    },
                   ),
                   filled: true,
                   fillColor: AppColors.surfaceGray,
@@ -272,9 +374,13 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               if (_isRegisterMode) ...[
                 const SizedBox(height: 14),
-                Text(_extraFieldLabel,
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w700)),
+                Text(
+                  _extraFieldLabel,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 6),
                 _buildTextField(
                   controller: _extraFieldController,
@@ -282,7 +388,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   icon: Icons.badge_outlined,
                 ),
               ],
-              const SizedBox(height: 24),
+              const SizedBox(height: 22),
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -307,11 +413,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       : Text(
                           _isRegisterMode ? 'Daftar & Masuk' : 'Masuk',
                           style: const TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w700),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               Center(
                 child: TextButton(
                   onPressed: () =>
@@ -328,7 +436,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               if (widget.initialRole == 'User') ...[
-                const Divider(height: 32),
+                const Divider(height: 28),
                 SizedBox(
                   width: double.infinity,
                   height: 48,
@@ -359,13 +467,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildTextField({
     required TextEditingController controller,
+    FocusNode? focusNode,
     required String hint,
     required IconData icon,
     TextInputType? keyboardType,
+    ValueChanged<String>? onChanged,
   }) {
     return TextField(
       controller: controller,
+      focusNode: focusNode,
       keyboardType: keyboardType,
+      onChanged: onChanged,
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: const TextStyle(fontSize: 14, color: AppColors.textMuted),
