@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/api_service.dart';
-import '../../widgets/animated_components.dart';
-import '../role_selection_screen.dart';
 
 class KurirTugasScreen extends StatefulWidget {
   const KurirTugasScreen({super.key});
@@ -12,41 +10,15 @@ class KurirTugasScreen extends StatefulWidget {
 }
 
 class _KurirTugasScreenState extends State<KurirTugasScreen> {
-  bool _showAktif = true;
-  int _bottomIndex = 0;
   bool _isLoading = true;
-  bool _isSubmitting = false;
-  bool _isTersedia = true;
-
-  String _kurirNama = 'Andi Pratama';
-  List<Map<String, dynamic>> _daftarTugas = [];
+  bool _isActionLoading = false;
+  List<Map<String, dynamic>> _tugasAktif = [];
+  String _kurirNama = 'Kurir';
 
   @override
   void initState() {
     super.initState();
     _loadTugas();
-  }
-
-  Future<void> _loadTugas() async {
-    setState(() => _isLoading = true);
-    try {
-      final nama = await ApiService.getNama();
-      final tugasRaw = await ApiService.getTugasKurir();
-      final tugasList = tugasRaw
-          .map((item) => Map<String, dynamic>.from(item as Map))
-          .toList();
-
-      if (!mounted) return;
-      setState(() {
-        _kurirNama = nama ?? 'Andi Pratama';
-        _daftarTugas = tugasList;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
   }
 
   void _showSnack(String msg, {bool isError = false}) {
@@ -59,61 +31,57 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
     );
   }
 
-  Future<void> _toggleKetersediaan() async {
-    final target = !_isTersedia;
-    setState(() => _isSubmitting = true);
+  Future<void> _loadTugas() async {
+    setState(() => _isLoading = true);
     try {
-      await ApiService.kurirUpdateKetersediaan(target);
+      final nama = await ApiService.getNama();
+      final raw = await ApiService.getTugasKurir();
       if (!mounted) return;
-      setState(() => _isTersedia = target);
-      _showSnack(
-        target
-            ? 'Status diubah menjadi Aktif'
-            : 'Status diubah menjadi Istirahat',
-      );
+      setState(() {
+        if (nama != null && nama.isNotEmpty) _kurirNama = nama;
+        _tugasAktif = raw
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .where((p) {
+              final st = (p['statusTerkini'] ?? p['status_terkini'] ?? '')
+                  .toString()
+                  .toLowerCase();
+              return !st.contains('selesai') && !st.contains('terkirim');
+            })
+            .toList();
+      });
     } catch (e) {
+      if (!mounted) return;
       _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
     } finally {
-      if (mounted) setState(() => _isSubmitting = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _terimaTugas(String noResi) async {
-    setState(() => _isSubmitting = true);
+  Future<void> _terimaPaket(String noResi) async {
+    setState(() => _isActionLoading = true);
     try {
       await ApiService.kurirTerimaPaket(noResi);
-      _showSnack('Tugas $noResi diterima! Status: Dalam Perjalanan.');
+      _showSnack('Paket $noResi berhasil diterima kurir!');
       await _loadTugas();
     } catch (e) {
       _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
     } finally {
-      if (mounted) setState(() => _isSubmitting = false);
+      if (mounted) setState(() => _isActionLoading = false);
     }
   }
 
-  Future<void> _updateLokasiDialog(String noResi) async {
-    final lokasiCtrl = TextEditingController(text: 'Keputih, Surabaya');
-    final ketCtrl =
-        TextEditingController(text: 'Kurir sedang menuju alamat penerima');
-
-    final confirmed = await showDialog<bool>(
+  Future<void> _dialogUpdateLokasi(String noResi) async {
+    final lokasiCtrl = TextEditingController();
+    final konfirmasi = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Perbarui Lokasi Pengiriman',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: lokasiCtrl,
-              decoration: const InputDecoration(labelText: 'Lokasi saat ini'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: ketCtrl,
-              decoration: const InputDecoration(labelText: 'Keterangan'),
-            ),
-          ],
+        title: Text('Update Lokasi ($noResi)',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        content: TextField(
+          controller: lokasiCtrl,
+          decoration: const InputDecoration(
+            hintText: 'Contoh: Jl. Panglima Sudirman, Lamongan',
+          ),
         ),
         actions: [
           TextButton(
@@ -126,543 +94,255 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
               backgroundColor: AppColors.navyPrimary,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Kirim Lokasi'),
+            child: const Text('Simpan'),
           ),
         ],
       ),
     );
 
-    if (confirmed != true) return;
+    if (konfirmasi != true || lokasiCtrl.text.trim().isEmpty) return;
 
-    setState(() => _isSubmitting = true);
+    setState(() => _isActionLoading = true);
     try {
       await ApiService.kurirUpdateLokasi(
         noResi: noResi,
         lokasiUpdate: lokasiCtrl.text.trim(),
-        deskripsiStatus: ketCtrl.text.trim(),
       );
-      _showSnack('Titik lokasi pengiriman berhasil diperbarui!');
+      _showSnack('Lokasi paket $noResi diperbarui!');
       await _loadTugas();
     } catch (e) {
       _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
     } finally {
-      if (mounted) setState(() => _isSubmitting = false);
+      if (mounted) setState(() => _isActionLoading = false);
     }
   }
 
   Future<void> _selesaiAntar(String noResi) async {
-    setState(() => _isSubmitting = true);
+    setState(() => _isActionLoading = true);
     try {
       await ApiService.kurirSelesaiAntar(noResi);
-      _showSnack('Paket $noResi ditandai telah sampai tujuan!');
+      _showSnack('Pengantaran $noResi selesai!');
       await _loadTugas();
     } catch (e) {
       _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
     } finally {
-      if (mounted) setState(() => _isSubmitting = false);
+      if (mounted) setState(() => _isActionLoading = false);
     }
-  }
-
-  Future<void> _logout() async {
-    await ApiService.logout();
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      SmoothPageRoute(page: const RoleSelectionScreen()),
-      (route) => false,
-    );
-  }
-
-  bool _isStatusSelesai(String status) {
-    final s = status.toLowerCase();
-    return s.contains('selesai') || s.contains('diterima');
   }
 
   @override
   Widget build(BuildContext context) {
-    final aktifList = _daftarTugas
-        .where((p) => !_isStatusSelesai((p['statusTerkini'] ?? '').toString()))
-        .toList();
-    final selesaiList = _daftarTugas
-        .where((p) => _isStatusSelesai((p['statusTerkini'] ?? '').toString()))
-        .toList();
-
-    final displayed = _showAktif ? aktifList : selesaiList;
-    final totalSemua = _daftarTugas.isEmpty ? 1 : _daftarTugas.length;
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: AppColors.navyPrimary),
-              )
-            : _bottomIndex == 2
-                ? _buildAkunTab()
-                : RefreshIndicator(
-                    onRefresh: _loadTugas,
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'KURIR / ${_kurirNama.toUpperCase()}',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  const Text(
-                                    'Siap mengantar?',
-                                    style: TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              BouncyTap(
-                                onTap:
-                                    _isSubmitting ? null : _toggleKetersediaan,
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 220),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: _isTersedia
-                                        ? AppColors.badgeGreenBg
-                                        : AppColors.yellowSoft,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.circle,
-                                        size: 8,
-                                        color: _isTersedia
-                                            ? AppColors.badgeGreenText
-                                            : AppColors.yellowText,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        _isTersedia ? 'Aktif' : 'Off',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: _isTersedia
-                                              ? AppColors.badgeGreenText
-                                              : AppColors.yellowText,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          FadeSlideIn(
-                            delayMs: 60,
-                            child: Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: AppColors.navyPrimary,
-                                borderRadius: BorderRadius.circular(22),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        '${selesaiList.length} / ${_daftarTugas.length}',
-                                        style: const TextStyle(
-                                          fontSize: 32,
-                                          fontWeight: FontWeight.w800,
-                                          color: AppColors.yellowAccent,
-                                        ),
-                                      ),
-                                      const Text(
-                                        'paket terkirim\nhari ini',
-                                        textAlign: TextAlign.right,
-                                        style: TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 13),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 14),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: LinearProgressIndicator(
-                                      value: selesaiList.length / totalSemua,
-                                      minHeight: 6,
-                                      backgroundColor: Colors.white24,
-                                      valueColor: const AlwaysStoppedAnimation(
-                                          AppColors.yellowAccent),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        '${aktifList.length} pengiriman tersisa',
-                                        style: const TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 12),
-                                      ),
-                                      const Icon(Icons.local_shipping_outlined,
-                                          color: AppColors.yellowAccent,
-                                          size: 18),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _TabButton(
-                                  label: 'Aktif (${aktifList.length})',
-                                  isSelected: _showAktif,
-                                  onTap: () =>
-                                      setState(() => _showAktif = true),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: _TabButton(
-                                  label: 'Selesai (${selesaiList.length})',
-                                  isSelected: !_showAktif,
-                                  onTap: () =>
-                                      setState(() => _showAktif = false),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 18),
-                          if (displayed.isEmpty)
-                            const Center(
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 32),
-                                child: Text(
-                                  'Tidak ada daftar tugas pada kategori ini.',
-                                  style:
-                                      TextStyle(color: AppColors.textSecondary),
-                                ),
-                              ),
-                            )
-                          else
-                            ...displayed.asMap().entries.map(
-                                  (entry) => FadeSlideIn(
-                                    delayMs: 80 + (entry.key * 70),
-                                    child: _buildTaskCard(entry.value),
-                                  ),
-                                ),
-                        ],
-                      ),
+    return RefreshIndicator(
+      onRefresh: _loadTugas,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'OPERASIONAL KURIR',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary,
+                      letterSpacing: 0.6,
                     ),
                   ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _bottomIndex,
-        onTap: (i) {
-          setState(() {
-            _bottomIndex = i;
-            if (i == 0) _showAktif = true;
-            if (i == 1) _showAktif = false;
-          });
-        },
-        selectedItemColor: AppColors.navyPrimary,
-        unselectedItemColor: AppColors.textMuted,
-        items: const [
-          BottomNavigationBarItem(
-              icon: Icon(Icons.local_shipping_outlined), label: 'Tugas'),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Riwayat'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline), label: 'Akun'),
-        ],
-      ),
-    );
-  }
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Tugas Pengantaran',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+                  ),
+                  Text(
+                    'Kurir: $_kurirNama',
+                    style: const TextStyle(
+                        fontSize: 13, color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+              IconButton(
+                onPressed: _loadTugas,
+                icon: const Icon(Icons.refresh, color: AppColors.navyPrimary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
 
-  Widget _buildTaskCard(Map<String, dynamic> paket) {
-    final noResi = (paket['noResi'] ?? '-').toString();
-    final penerima = (paket['namaPenerima'] ?? '-').toString();
-    final alamat = (paket['alamatTujuan'] ?? '-').toString();
-    final jenis = (paket['jenisPaket'] ?? 'Reguler').toString();
-    final berat = (paket['beratKg'] ?? '1').toString();
-    final status =
-        (paket['statusTerkini'] ?? 'Menunggu Penjemputan').toString();
-    final statusLower = status.toLowerCase();
-
-    final isBaru =
-        statusLower.contains('menunggu') || statusLower.contains('proses');
-    final isPerjalanan = statusLower.contains('perjalanan') ||
-        statusLower.contains('antar') ||
-        statusLower.contains('dikirim');
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceGray,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (isBaru)
-            Row(
+          // Banner Ringkasan
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppColors.navyPrimary,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'TUGAS BARU',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textSecondary,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Paket Aktif Hari Ini',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_tugasAktif.length} Paket',
+                      style: const TextStyle(
+                        color: AppColors.yellowAccent,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  '$jenis · $berat kg',
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary),
-                ),
+                const Icon(Icons.local_shipping,
+                    color: AppColors.yellowAccent, size: 36),
               ],
-            )
-          else if (isPerjalanan)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.badgeBlueBg,
-                borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.only(top: 50),
+              child: Center(
+                child: CircularProgressIndicator(color: AppColors.navyPrimary),
               ),
-              child: Text(
-                status,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.badgeBlueText,
+            )
+          else if (_tugasAktif.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 40),
+              child: Center(
+                child: Text(
+                  'Belum ada tugas pengantaran aktif.',
+                  style: TextStyle(color: AppColors.textSecondary),
                 ),
               ),
             )
           else
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.badgeGreenBg,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                status,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.badgeGreenText,
-                ),
-              ),
-            ),
-          const SizedBox(height: 10),
-          Text(
-            penerima,
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '$noResi · $jenis · $berat kg',
-            style:
-                const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 6),
+            ..._tugasAktif.map((p) => _buildTugasCard(p)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTugasCard(Map<String, dynamic> p) {
+    final resi = (p['noResi'] ?? p['no_resi'] ?? '-').toString();
+    final penerima =
+        (p['namaPenerima'] ?? p['nama_penerima'] ?? '-').toString();
+    final tujuan =
+        (p['alamatTujuan'] ?? p['alamat_tujuan'] ?? '-').toString();
+    final status =
+        (p['statusTerkini'] ?? p['status_terkini'] ?? 'Ditugaskan').toString();
+    final isMenunggu = status.toLowerCase().contains('menunggu') ||
+        status.toLowerCase().contains('ditugaskan');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceGray,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Icon(Icons.location_on_outlined,
-                  size: 16, color: AppColors.textSecondary),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  alamat,
+              Text(resi,
                   style: const TextStyle(
-                      fontSize: 13, color: AppColors.textSecondary),
+                      fontWeight: FontWeight.w800, fontSize: 13)),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.badgeBlueBg,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  status,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.badgeBlueText,
+                  ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          Text(penerima,
+              style:
+                  const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          const SizedBox(height: 2),
+          Text(tujuan,
+              style: const TextStyle(
+                  fontSize: 13, color: AppColors.textSecondary)),
           const SizedBox(height: 14),
-          if (isBaru)
+          if (isMenunggu)
             SizedBox(
               width: double.infinity,
-              height: 46,
+              height: 44,
               child: ElevatedButton.icon(
-                onPressed: _isSubmitting ? null : () => _terimaTugas(noResi),
+                onPressed: _isActionLoading ? null : () => _terimaPaket(resi),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.yellowAccent,
                   foregroundColor: AppColors.navyPrimary,
-                  elevation: 0,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(12)),
                 ),
-                icon: const Icon(Icons.arrow_forward, size: 18),
-                label: const Text('Terima Tugas',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
+                icon: const Icon(Icons.check_circle_outline, size: 18),
+                label: const Text('Terima Paket dari Gudang',
+                    style: TextStyle(fontWeight: FontWeight.w800)),
               ),
             )
-          else if (isPerjalanan) ...[
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: ElevatedButton.icon(
-                onPressed:
-                    _isSubmitting ? null : () => _updateLokasiDialog(noResi),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.navyPrimary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                ),
-                icon: const Icon(Icons.arrow_forward, size: 16),
-                label: const Text('Dalam Perjalanan · Perbarui',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: ElevatedButton.icon(
-                onPressed: _isSubmitting ? null : () => _selesaiAntar(noResi),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.yellowAccent,
-                  foregroundColor: AppColors.navyPrimary,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                ),
-                icon: const Icon(Icons.arrow_forward, size: 16),
-                label: const Text('Telah Sampai Tujuan',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
-              ),
-            ),
-          ] else
-            const Text(
-              'Pengiriman untuk paket ini telah diselesaikan.',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAkunTab() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Akun Kurir',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceGray,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Row(
+          else
+            Row(
               children: [
-                const CircleAvatar(
-                  radius: 26,
-                  backgroundColor: AppColors.navyPrimary,
-                  child: Icon(Icons.local_shipping,
-                      color: AppColors.yellowAccent),
-                ),
-                const SizedBox(width: 14),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(_kurirNama,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 16)),
-                    const Text('Role: Kurir',
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isActionLoading
+                        ? null
+                        : () => _dialogUpdateLokasi(resi),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.navyPrimary,
+                      side: const BorderSide(color: AppColors.navyPrimary),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.location_on_outlined, size: 16),
+                    label: const Text('Lokasi',
                         style: TextStyle(
-                            color: AppColors.textSecondary, fontSize: 13)),
-                  ],
+                            fontSize: 12, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed:
+                        _isActionLoading ? null : () => _selesaiAntar(resi),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.navyPrimary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.done_all, size: 16),
+                    label: const Text('Selesai',
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w700)),
+                  ),
                 ),
               ],
             ),
-          ),
-          const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: _logout,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade700,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-              ),
-              icon: const Icon(Icons.logout),
-              label: const Text('Keluar / Logout',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
-            ),
-          ),
         ],
-      ),
-    );
-  }
-}
-
-class _TabButton extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-  const _TabButton(
-      {required this.label, required this.isSelected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        height: 44,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.navyPrimary : AppColors.surfaceGray,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            color: isSelected ? Colors.white : AppColors.textSecondary,
-          ),
-        ),
       ),
     );
   }
