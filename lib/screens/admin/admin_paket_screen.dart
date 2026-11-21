@@ -23,8 +23,8 @@ class _AdminPaketScreenState extends State<AdminPaketScreen> {
   Future<void> _fetchPaket() async {
     setState(() => _isLoading = true);
     try {
-      // Memanggil GET /api/paket/saya atau GET /api/paket/saya?status=<status_terkini>
-      final raw = await ApiService.getPaketSaya(
+      // Memanggil GET /api/gudang/paket atau GET /api/gudang/paket?status=<status_terkini>
+      final raw = await ApiService.getGudangPaket(
         status: _selectedStatus.isEmpty ? null : _selectedStatus,
       );
       if (!mounted) return;
