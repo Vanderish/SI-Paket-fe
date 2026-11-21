@@ -41,7 +41,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final paketRaw = await ApiService.getPaketSaya();
+      final paketRaw = await ApiService.getGudangPaket();
       final kurirRaw = await ApiService.getDaftarKurir();
       final nama = await ApiService.getNama();
 
