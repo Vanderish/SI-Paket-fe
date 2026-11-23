@@ -346,7 +346,7 @@ class ApiService {
     final res = await http.patch(
       Uri.parse('$baseUrl/gudang/paket/$noResi/assign-kurir'),
       headers: headers,
-      body: jsonEncode({'id_kurir': idKurir}),
+      body: jsonEncode({'idKurir': idKurir}),
     );
     _parseResponse(res);
   }
