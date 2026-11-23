@@ -16,6 +16,7 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
   bool _isOnline = true;
   List<Map<String, dynamic>> _tugasList = [];
   String _kurirNama = 'Kurir';
+  String _selectedStatus = ''; // '' = semua, atau 'Menunggu Penjemputan', 'Dalam Perjalanan', 'Selesai'
 
   @override
   void initState() {
@@ -37,6 +38,7 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
     setState(() => _isLoading = true);
     try {
       final nama = await ApiService.getNama();
+      // Ambil SEMUA tugas sekali saja, filter dilakukan lokal di UI
       final raw = await ApiService.getTugasKurir();
       if (!mounted) return;
       setState(() {
@@ -162,14 +164,31 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final aktif = _tugasList.where((p) {
+    // Statistik selalu dihitung dari keseluruhan _tugasList (tidak berubah saat filter)
+    final totalAktif = _tugasList.where((p) {
       final st = (p['statusTerkini'] ?? p['status_terkini'] ?? '')
           .toString()
           .toLowerCase();
       return !st.contains('selesai') && !st.contains('terkirim');
-    }).toList();
+    }).length;
 
-    final selesaiCount = _tugasList.length - aktif.length;
+    final totalSelesai = _tugasList.length - totalAktif;
+
+    // Filter lokal berdasarkan statusTerkini
+    final filteredList = _tugasList.where((p) {
+      if (_selectedStatus.isEmpty) return true;
+      final st = (p['statusTerkini'] ?? p['status_terkini'] ?? '')
+          .toString()
+          .toLowerCase();
+      if (_selectedStatus == 'Menunggu') {
+        return st.contains('menunggu') || st.contains('ditugaskan');
+      } else if (_selectedStatus == 'Perjalanan') {
+        return st.contains('perjalanan');
+      } else if (_selectedStatus == 'Terkirim') {
+        return st.contains('selesai') || st.contains('terkirim');
+      }
+      return st.contains(_selectedStatus.toLowerCase());
+    }).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -287,11 +306,11 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: _driverStat('${aktif.length}', 'Tugas Aktif'),
+                          child: _driverStat('$totalAktif', 'Tugas Aktif'),
                         ),
                         Container(width: 1, height: 32, color: Colors.white24),
                         Expanded(
-                          child: _driverStat('$selesaiCount', 'Selesai Antar'),
+                          child: _driverStat('$totalSelesai', 'Selesai Antar'),
                         ),
                       ],
                     ),
@@ -304,6 +323,23 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
                 'Daftar Misi Pengantaran',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
               ),
+              const SizedBox(height: 8),
+
+              // Filter Status (filter lokal di memory)
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildFilterChip('Semua', ''),
+                    const SizedBox(width: 8),
+                    _buildFilterChip('Menunggu', 'Menunggu'),
+                    const SizedBox(width: 8),
+                    _buildFilterChip('Perjalanan', 'Perjalanan'),
+                    const SizedBox(width: 8),
+                    _buildFilterChip('Terkirim', 'Terkirim'),
+                  ],
+                ),
+              ),
               const SizedBox(height: 12),
 
               if (_isLoading)
@@ -315,7 +351,7 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
                     ),
                   ),
                 )
-              else if (aktif.isEmpty)
+              else if (filteredList.isEmpty)
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -331,27 +367,30 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
                       ),
                       SizedBox(height: 8),
                       Text(
-                        'Tidak ada paket aktif saat ini.',
+                        'Tidak ada paket pada filter ini.',
                         style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Tarik layar ke bawah untuk memuat penugasan baru dari Admin Pos.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
                       ),
                     ],
                   ),
                 )
               else
-                ...aktif.map((p) => _buildMissionCard(p)),
+                ...filteredList.map((p) => _buildMissionCard(p)),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, String statusValue) {
+    final selected = _selectedStatus == statusValue;
+    return ChoiceChip(
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      selected: selected,
+      onSelected: (_) {
+        setState(() => _selectedStatus = statusValue);
+        // Filter lokal di memory, tidak perlu hit API
+      },
     );
   }
 
@@ -384,8 +423,10 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
     final status =
         (p['statusTerkini'] ?? p['status_terkini'] ?? 'Ditugaskan').toString();
 
-    final belumDiambil = status.toLowerCase().contains('menunggu') ||
-        status.toLowerCase().contains('ditugaskan');
+    final statusLower = status.toLowerCase();
+    final belumDiambil = statusLower.contains('menunggu') ||
+        statusLower.contains('ditugaskan');
+    final sudahTerkirim = statusLower.contains('selesai') || statusLower.contains('terkirim');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -496,6 +537,37 @@ class _KurirTugasScreenState extends State<KurirTugasScreen> {
                   '1. Konfirmasi Ambil Paket',
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
+              ),
+            )
+          else if (sudahTerkirim)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.badgeGreenBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: AppColors.badgeGreenText, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Paket Sudah Diterima',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                            color: AppColors.badgeGreenText,
+                          ),
+                        ),
+                        const SizedBox(height: 2)
+                      ],
+                    ),
+                  ),
+                ],
               ),
             )
           else

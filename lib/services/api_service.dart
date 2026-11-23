@@ -346,7 +346,7 @@ class ApiService {
     final res = await http.patch(
       Uri.parse('$baseUrl/gudang/paket/$noResi/assign-kurir'),
       headers: headers,
-      body: jsonEncode({'id_kurir': idKurir}),
+      body: jsonEncode({'idKurir': idKurir}),
     );
     _parseResponse(res);
   }
@@ -373,8 +373,20 @@ class ApiService {
       },
     );
     final res = await http.get(uri, headers: headers);
+
+    if (res.statusCode == 401) {
+      throw Exception('Token expired atau tidak valid');
+    } else if (res.statusCode == 403) {
+      throw Exception('Role Kurir diperlukan');
+    }
+
     final data = _parseResponse(res);
-    return data is List ? data : (data['data'] as List? ?? []);
+    if (data is List) {
+      return data;
+    } else if (data is Map && data['data'] is List) {
+      return data['data'] as List;
+    }
+    return [];
   }
 
   static Future<void> kurirTerimaPaket(
